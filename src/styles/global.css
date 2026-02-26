@@ -180,8 +180,7 @@ html.dark .terminal-wrapper .top-bar {
 }
 
 /* Table containers - horizontal scroll on mobile */
-.prose table {
-  display: block;
+.prose .table-wrapper {
   overflow-x: auto;
 }
 
@@ -291,6 +290,13 @@ button.copy::after {
 
 button.copy.copied::after {
   content: "Copied!";
+}
+
+/* Hide copy buttons without JS, they require JS to function */
+html:not([data-theme]) button.copy,
+html:not([data-theme]) .shiki-copy,
+html:not([data-theme]) pre.astro-code > button.copy {
+  display: none;
 }
 
 /* Terminal prompt styling */

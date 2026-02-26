@@ -1,0 +1,164 @@
+---
+/**
+ * Renders a grid of blog post cards with a "Load More" button or infinite scroll
+ * for fetching additional pages via HTML fragment fetching.
+ * Pass `nextUrl` to enable loading more posts.
+ * The user's preference (button vs auto-scroll) is persisted in localStorage.
+ */
+import type { CollectionEntry } from "astro:content"
+import BlogPostCard from "./BlogPostCard.astro"
+
+interface Props {
+  posts: CollectionEntry<"blog">[]
+  nextUrl?: string
+  prevUrl?: string
+}
+
+const { posts, nextUrl, prevUrl } = Astro.props
+---
+
+<div
+  id="post-grid"
+  data-next-url={nextUrl}
+  class="mt-12 px-6 sm:px-4 lg:px-0 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+>
+  {posts.map((post) => <BlogPostCard post={post} />)}
+</div>
+
+<div
+  id="load-mode-toggle"
+  class="flex justify-end mt-6 px-6 lg:px-0"
+  style="display: none"
+>
+  <label class="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400 cursor-pointer select-none">
+    <input type="checkbox" id="scroll-toggle" class="cursor-pointer" />
+    Auto-load on scroll
+  </label>
+</div>
+
+{
+  nextUrl && (
+    <>
+      <div
+        id="load-more-container"
+        class="flex justify-center my-8 pb-16"
+        style="display: none"
+      >
+        <button
+          id="load-more-btn"
+          class="px-6 py-2 border border-blue-650 text-blue-650 hover:border-blue-800 hover:text-blue-800 dark:border-slate-400 dark:text-slate-300 dark:hover:border-white dark:hover:text-white font-bold rounded-md transition-colors cursor-pointer"
+        >
+          Load More
+        </button>
+      </div>
+      <div id="scroll-sentinel" class="h-16" />
+    </>
+  )
+}
+{
+  (prevUrl || nextUrl) && (
+    <noscript>
+      <nav class="max-w-4xl mx-auto my-8 pb-24 flex px-6 lg:px-0">
+        {prevUrl && <a href={prevUrl} class="font-bold text-black">← Newer Posts</a>}
+        {nextUrl && <a href={nextUrl} class="font-bold text-black ml-auto">Older Posts →</a>}
+      </nav>
+    </noscript>
+  )
+}
+
+<script>
+  const STORAGE_KEY = "blogLoadMode"
+
+  const grid = document.getElementById("post-grid")
+  const container = document.getElementById(
+    "load-more-container"
+  ) as HTMLElement | null
+  const btn = document.getElementById("load-more-btn") as HTMLButtonElement | null
+  const toggleContainer = document.getElementById(
+    "load-mode-toggle"
+  ) as HTMLElement | null
+  const scrollCheckbox = document.getElementById(
+    "scroll-toggle"
+  ) as HTMLInputElement | null
+  const sentinel = document.getElementById("scroll-sentinel")
+
+  const savedMode = localStorage.getItem(STORAGE_KEY) ?? "button"
+
+  if (toggleContainer) toggleContainer.style.display = ""
+  if (scrollCheckbox) scrollCheckbox.checked = savedMode === "scroll"
+
+  let applyMode = (_mode: string) => {}
+
+  if (btn && grid?.dataset.nextUrl) {
+    let observer: IntersectionObserver | null = null
+
+    const loadMore = async () => {
+      if (!grid.dataset.nextUrl) return
+      btn.disabled = true
+      btn.textContent = "Loading…"
+
+      try {
+        const res = await fetch(grid.dataset.nextUrl)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+        const doc = new DOMParser().parseFromString(await res.text(), "text/html")
+
+        doc.querySelectorAll("#post-grid > div").forEach((card) => {
+          grid.appendChild(card)
+        })
+
+        const newNextUrl = doc.getElementById("post-grid")?.dataset.nextUrl
+        if (newNextUrl) {
+          grid.dataset.nextUrl = newNextUrl
+          btn.disabled = false
+          btn.textContent = "Load More"
+        } else {
+          grid.removeAttribute("data-next-url")
+          container?.remove()
+          sentinel?.remove()
+          observer?.disconnect()
+        }
+      } catch (err) {
+        console.error("Failed to load more posts:", err)
+        btn.disabled = false
+        btn.textContent = "Load More"
+      }
+    }
+
+    const enableScrollMode = () => {
+      if (container) container.style.display = "none"
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && grid.dataset.nextUrl) {
+            loadMore()
+          }
+        },
+        { rootMargin: "200px" }
+      )
+      if (sentinel) observer.observe(sentinel)
+    }
+
+    const enableButtonMode = () => {
+      observer?.disconnect()
+      observer = null
+      if (container) container.style.display = ""
+    }
+
+    applyMode = (mode: string) => {
+      if (mode === "scroll") {
+        enableScrollMode()
+      } else {
+        enableButtonMode()
+      }
+    }
+
+    applyMode(savedMode)
+    btn.addEventListener("click", loadMore)
+  }
+
+  scrollCheckbox?.addEventListener("change", () => {
+    const mode = scrollCheckbox.checked ? "scroll" : "button"
+    localStorage.setItem(STORAGE_KEY, mode)
+    applyMode(mode)
+  })
+</script>
