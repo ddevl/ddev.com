@@ -1,11 +1,36 @@
 ---
 import Layout from "../layouts/Layout.astro"
 import SectionHeading from "../components/SectionHeading.astro"
+import {
+  getRepoDetails,
+  getContributors,
+  getReleases,
+  getSponsorshipData,
+} from "../lib/api"
+import { getActiveUsers } from "../lib/amplitude"
+import { GITHUB_REPO } from "../const"
 
 const title = `Sponsor DDEV`
 
+const repoData = await getRepoDetails(GITHUB_REPO)
+const contributorData = await getContributors(true)
+const releaseData = await getReleases()
+
+// Monthly funding goal for both maintainers, from the live sponsorship data
+const sponsorshipData = await getSponsorshipData()
+const fundingGoal = sponsorshipData?.current_goal?.target_amount || 12000
+
+const activeUsers = await getActiveUsers()
+const stargazers = repoData.stargazers_count || 0
+
 const linkClass =
   "font-bold text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+
+// External links open in a new tab, matching the rehypeExternalLinks
+// behavior used for markdown content (see astro.config.mjs).
+const isExternal = (href: string) => /^https?:\/\//.test(href)
+const externalAttrs = (href: string) =>
+  isExternal(href) ? { target: "_blank", rel: "noopener noreferrer" } : {}
 
 const paypalCta = {
   label: "Sponsor via PayPal",
@@ -144,7 +169,7 @@ const sponsorshipTiers = [
                       ✓{" "}
                       {parseReward(reward).map((part) =>
                         part.type === "link" ? (
-                          <a href={part.href} class={linkClass}>{part.text}</a>
+                          <a href={part.href} class={linkClass} {...externalAttrs(part.href)}>{part.text}</a>
                         ) : (
                           part.text
                         )
@@ -157,6 +182,8 @@ const sponsorshipTiers = [
                   <a
                     href={`https://github.com/sponsors/ddev?amount=${tier.amount.replace(",", "")}`}
                     class="inline-flex items-center justify-center gap-2 rounded-full bg-neutral-900 px-5 py-3 font-bold text-white transition hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
                     Sponsor via GitHub
                   </a>
@@ -164,6 +191,7 @@ const sponsorshipTiers = [
                   <a
                     href={tier.secondaryCta.href}
                     class="inline-flex items-center justify-center gap-2 rounded-full border border-neutral-400 bg-white px-5 py-3 font-bold text-neutral-900 transition hover:bg-neutral-200 dark:border-neutral-600 dark:bg-neutral-900 dark:text-white dark:hover:bg-neutral-800"
+                    {...externalAttrs(tier.secondaryCta.href)}
                   >
                     <span>{tier.secondaryCta.label}</span>
                   </a>
@@ -181,15 +209,21 @@ const sponsorshipTiers = [
             fundamental challenge: the software is free, but building and maintaining
             it is not. Recurring monthly sponsorships are the lifeblood of the DDEV
             project — they let our two full-time maintainers, <a
-              href="https://github.com/rfay">Randy Fay</a
-            > and <a href="https://github.com/stasadev">Stas Zhuk</a>, stay
+              href="https://github.com/rfay"
+              target="_blank"
+              rel="noopener noreferrer">Randy Fay</a
+            > and <a
+              href="https://github.com/stasadev"
+              target="_blank"
+              rel="noopener noreferrer">Stas Zhuk</a
+            >, stay
             focused on DDEV instead of splitting their attention with outside
             work.
           </p>
 
           <p>
             The <a href="/foundation/">Foundation's</a> goal is <strong
-              >$12,000/month</strong
+              >${fundingGoal.toLocaleString("en-US")}/month</strong
             > to fully fund both maintainers. Whether you contribute $5/month or $1,000/month,
             every recurring sponsorship brings the project closer to sustainability
             — and signals to the wider community that DDEV is a healthy project organizations
@@ -207,7 +241,8 @@ const sponsorshipTiers = [
           <p>
             <strong>GitHub Sponsors</strong> — <a
               href="https://github.com/sponsors/ddev"
-              >github.com/sponsors/ddev</a
+              target="_blank"
+              rel="noopener noreferrer">github.com/sponsors/ddev</a
             >. 100% of personal sponsorships go directly to the Foundation;
             GitHub charges no fees for personal accounts.
           </p>
@@ -215,7 +250,8 @@ const sponsorshipTiers = [
           <p>
             <strong>PayPal</strong> — <a
               href="https://www.paypal.com/donate/?hosted_button_id=MCNCSZHC7LHSQ"
-              >Donate via PayPal</a
+              target="_blank"
+              rel="noopener noreferrer">Donate via PayPal</a
             > for one-time or recurring contributions.
           </p>
 
@@ -227,7 +263,7 @@ const sponsorshipTiers = [
           </p>
 
           <p>
-            As a US 501(c)(3) nonprofit, sponsorships to the DDEV Foundation may
+            As a <a href="/blog/501c3/">US 501(c)(3) nonprofit</a>, sponsorships to the DDEV Foundation may
             be tax-deductible. Please consult your tax advisor.
           </p>
         </section>
@@ -236,11 +272,13 @@ const sponsorshipTiers = [
           <SectionHeading title="About DDEV" />
 
           <p>
-            DDEV is the open-source local development environment trusted by
-            19,000+ active developers worldwide for PHP, JavaScript, and HTML
-            projects — Drupal, WordPress, Laravel, TYPO3, Craft CMS, Magento,
-            and more. Since 2016 it has grown to 3,600+ GitHub stars, 222
-            releases, and 399 contributors.
+            DDEV is the open-source local development environment trusted by{" "}
+            {activeUsers.toLocaleString("en-US")}+ active developers worldwide for
+            PHP, JavaScript, and HTML projects — Drupal, WordPress, Laravel, TYPO3,
+            Craft CMS, Magento, and more. Since 2016 it has grown to {
+              stargazers.toLocaleString("en-US")
+            } GitHub stars, {releaseData.length.toLocaleString("en-US")} releases,
+            and {contributorData.length.toLocaleString("en-US")} contributors.
           </p>
         </section>
 
